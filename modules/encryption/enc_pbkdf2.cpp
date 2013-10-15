@@ -34,7 +34,7 @@ char* random_string(int len)
 	ran[len]='\0';
 	return ran;
 }
-inline static  const char*  pbkdf2_salt(void)
+inline static  char*  pbkdf2_salt(void)
 {
 	static char buf[SALTLEN + 1];
 	char* randstr=random_string(SALTLEN);
@@ -95,7 +95,7 @@ int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
 }
 class EPBKDF2 : public Module
 {
-	char*  salt[SALTLEN];
+	char*  salt;
 	
 	public:
 		EPBKDF2(const Anope::string &modname,const Anope::string &creator) : Module(modname,creator,ENCRYPTION| VENDOR)
