@@ -106,6 +106,7 @@ class EPBKDF2 : public Module
 			if(pos== Anope::string::npos)
 				return -1;
 			Anope::string buf = password.substr(password.find(':', pos + 1) + 1, password.length());
+			salt=(char*)malloc(SALTLEN+1);
 			memcpy(salt,buf.c_str(),SALTLEN);
 			return 1;
 		}
@@ -129,7 +130,7 @@ class EPBKDF2 : public Module
 				sprintf(outbuf +  (iter * 2), "%02x", 255 & digestbuf[iter]);
 			}
 			dest = Anope::string("pbkdf2:")+Anope::string(outbuf)+Anope::string(":")+Anope::string(salt);
-			Log(LOG_COMMAND) << "(enc_pbkd2) hashed password from [" << src << "] to [" << dest << "]";
+			dest.erase(dest.find_last_not_of(" \n\r\t")+1);
 			salt=NULL;
 			return EVENT_ALLOW;
 		}
@@ -151,8 +152,10 @@ class EPBKDF2 : public Module
 			Anope::string buf;
 			GetSaltFromPass(nc->pass);
 		this->OnEncrypt(req->GetPassword(), buf);
+		//Log(LOG_COMMAND) << "Does " << buf << "Equal " << nc->pass;
 		if (nc->pass.equals_cs(buf))
 		{
+			//Log(LOG_COMMAND) << "It does! it does equal!";
 			/* if we are NOT the first module in the list,
 			 * we want to re-encrypt the pass with the new encryption
 			 */
