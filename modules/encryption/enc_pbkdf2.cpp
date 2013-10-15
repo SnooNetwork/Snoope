@@ -95,28 +95,37 @@ int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
 }
 class EPBKDF2 : public Module
 {
-	char*  salt;
-
+	char*  salt[SALTLEN];
+	
 	public:
 		EPBKDF2(const Anope::string &modname,const Anope::string &creator) : Module(modname,creator,ENCRYPTION| VENDOR)
 		{
 		}
+		
+		int GetSaltFromPass(const Anope::string &password)
+		{
+			size_t pos = password.find(':');
+			if(pos== Anope::string::npos)
+				return -1;
+			Anope::string buf = password.substr(password.find(':', pos + 1) + 1, password.length());
+			memcpy(salt,buf.c_str(),SALTLEN);
+			return 1;
+		}
 		EventReturn OnEncrypt(const Anope::string &src, Anope::string &dest) anope_override
 		{
 			static char outbuf[289];
+			
 			static unsigned char digestbuf[SHA512_DIGEST_LENGTH];
 			int res, iter;
 	
-			memcpy(outbuf, src.c_str(), SALTLEN);
-			res=PKCS5_PBKDF2_HMAC(src.c_str(),src.length(),(const unsigned char *)src.c_str(),SALTLEN,ROUNDS,EVP_sha512(), SHA512_DIGEST_LENGTH, digestbuf);
+			//memcpy(outbuf, src.c_str(), SALTLEN);
+			res=PKCS5_PBKDF2_HMAC(src.c_str(),src.length(),(const unsigned char *)salt,SALTLEN,ROUNDS,EVP_sha512(), SHA512_DIGEST_LENGTH, digestbuf);
 			for (iter = 0; iter < SHA512_DIGEST_LENGTH; iter++)
 			{
 //				Log(LOG_COMMAND) << "This is a test " << digestbuf[iter];
-				sprintf(outbuf + SALTLEN + (iter * 2), "%02x", 255 & digestbuf[iter]);
+				sprintf(outbuf +  (iter * 2), "%02x", 255 & digestbuf[iter]);
 			}
-			for(int i=0;i<289;i++)
-				Log(LOG_COMMAND) << "THis is the next char: " << outbuf[i];
-			dest = Anope::string(outbuf);
+			dest = Anope::string("pbkdf2:")+Anope::string(outbuf)+Anope::string(":")+Anope::string(salt);
 			Log(LOG_COMMAND) << "(enc_pbkd2) hashed password from [" << src << "] to [" << dest << "]";
 			return EVENT_ALLOW;
 		}
@@ -135,6 +144,10 @@ class EPBKDF2 : public Module
 			if (!hash_method.equals_cs("pbkdf2"))
 				return;
 			Anope::string buf;
+			if(GetSaltFromPass(nc->pass)==-1)
+			{
+				salt=pbkdf2_salt();
+			}
 		this->OnEncrypt(req->GetPassword(), buf);
 		if (nc->pass.equals_cs(buf))
 		{
@@ -148,3 +161,4 @@ class EPBKDF2 : public Module
 	}
 };
 MODULE_INIT(EPBKDF2)
+
