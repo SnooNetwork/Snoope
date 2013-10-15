@@ -9,9 +9,6 @@
 #define SALTLEN		(16)
 
 static const char alphanum[] =
-"0123456789"
-"!@#$%^&*"
-"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 "abcdefghijklmnopqrstuvwxyz";
 
 int stringLength = sizeof(alphanum) - 1;
@@ -26,7 +23,7 @@ char* random_string(int len)
 {
 	srand(time(0));
 	char* ran;
-	memset(ran,0,len+1);
+	ran=(char*)malloc(len+1);
 	for(int i=0;i<len;i++)
 	{
 		ran[i]=genRandom();
@@ -100,6 +97,7 @@ class EPBKDF2 : public Module
 	public:
 		EPBKDF2(const Anope::string &modname,const Anope::string &creator) : Module(modname,creator,ENCRYPTION| VENDOR)
 		{
+			salt=NULL;
 		}
 		
 		int GetSaltFromPass(const Anope::string &password)
@@ -113,6 +111,11 @@ class EPBKDF2 : public Module
 		}
 		EventReturn OnEncrypt(const Anope::string &src, Anope::string &dest) anope_override
 		{
+			if(salt==NULL)
+                        {
+                                salt=pbkdf2_salt();
+                        }
+
 			static char outbuf[289];
 			
 			static unsigned char digestbuf[SHA512_DIGEST_LENGTH];
@@ -127,11 +130,13 @@ class EPBKDF2 : public Module
 			}
 			dest = Anope::string("pbkdf2:")+Anope::string(outbuf)+Anope::string(":")+Anope::string(salt);
 			Log(LOG_COMMAND) << "(enc_pbkd2) hashed password from [" << src << "] to [" << dest << "]";
+			salt=NULL;
 			return EVENT_ALLOW;
 		}
 
 		void OnCheckAuthentication(User *, IdentifyRequest *req) anope_override
 		{
+			salt=NULL;
 			const NickAlias *na = NickAlias::Find(req->GetAccount());
 			if (na == NULL)
 				return;
@@ -144,10 +149,7 @@ class EPBKDF2 : public Module
 			if (!hash_method.equals_cs("pbkdf2"))
 				return;
 			Anope::string buf;
-			if(GetSaltFromPass(nc->pass)==-1)
-			{
-				salt=pbkdf2_salt();
-			}
+			GetSaltFromPass(nc->pass);
 		this->OnEncrypt(req->GetPassword(), buf);
 		if (nc->pass.equals_cs(buf))
 		{
